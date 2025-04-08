@@ -8,33 +8,98 @@ import {
   SafeAreaView,
   StatusBar,
   Platform,
-  Alert
+  Alert,
+  ActivityIndicator
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { ImageDetectionModal } from '../ImageDetectionModal';
-import { saveMealEntry, getMealEntries } from '../mealStorage';
+import { Ionicons } from '@expo/vector-icons';
+// Import with default exports
+import ImageDetectionModal from '../ImageDetectionModal';
+import { saveMealEntry, getMealEntries, calculateDailyNutrition, getUserGoals } from '../mealStorage';
+import EditMealModal, { MealData } from '../EditMealModal'; // Changed to default importimport GoalSettingsModal, { UserGoals } from '../GoalSettingsModal';
+import BarcodeScanner from '../BarcodeScanner';
+import MealHistory from '../MealHistory';
+import GoalSettingsModal from '../GoalSettingsModal'; // Fixed import for GoalSettingsModal
+import { UserGoals } from '../GoalSettingsModal';
+
+// Define TypeScript interfaces
+interface NutritionData {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  proteinPercentage: number;
+  carbsPercentage: number;
+  fatPercentage: number;
+}
 
 export default function HomeScreen() {
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [capturedImage, setCapturedImage] = useState(null);
-  const [meals, setMeals] = useState([]);
-  const [totalCalories, setTotalCalories] = useState(0);
+  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [isGoalModalVisible, setIsGoalModalVisible] = useState(false);
+  const [isBarcodeModalVisible, setIsBarcodeModalVisible] = useState(false);
+  const [isHistoryVisible, setIsHistoryVisible] = useState(false);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [selectedMeal, setSelectedMeal] = useState<MealData | null>(null);
+  const [meals, setMeals] = useState<MealData[]>([]);
+  const [todayMeals, setTodayMeals] = useState<MealData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [nutrition, setNutrition] = useState<NutritionData>({
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    fat: 0,
+    proteinPercentage: 0,
+    carbsPercentage: 0,
+    fatPercentage: 0
+  });
+  const [userGoals, setUserGoals] = useState<UserGoals>({
+    calorieTarget: 2000,
+    proteinTarget: 80,
+    carbTarget: 250,
+    fatTarget: 70,
+    goalType: 'maintain',
+    activityLevel: 'moderate'
+  });
 
   useEffect(() => {
-    loadMeals();
+    loadData();
   }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      await loadMeals();
+      await loadNutrition();
+      await loadGoals();
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadMeals = async () => {
     const savedMeals = await getMealEntries();
     setMeals(savedMeals);
     
-    // Calculate total calories for today
+    // Filter for today's meals
     const today = new Date().toDateString();
-    const todayCalories = savedMeals
+    const todaysMeals = savedMeals
       .filter(meal => new Date(meal.timestamp).toDateString() === today)
-      .reduce((sum, meal) => sum + (meal.calories || 0), 0);
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     
-    setTotalCalories(todayCalories);
+    setTodayMeals(todaysMeals);
+  };
+
+  const loadNutrition = async () => {
+    const dailyNutrition = await calculateDailyNutrition();
+    setNutrition(dailyNutrition);
+  };
+
+  const loadGoals = async () => {
+    const goals = await getUserGoals();
+    setUserGoals(goals);
   };
 
   // Camera permission and handling
@@ -55,33 +120,67 @@ export default function HomeScreen() {
 
       if (!result.canceled) {
         setCapturedImage(result.assets[0].uri);
-        setIsModalVisible(true);
+        setIsAddModalVisible(true);
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to take picture');
     }
   };
 
-  const handleSaveMeal = async (mealEntry) => {
+  const handleSaveMeal = async (mealEntry: MealData) => {
     try {
       await saveMealEntry(mealEntry);
-      await loadMeals(); // Refresh meals list
+      await loadData(); // Refresh data
       Alert.alert('Success', 'Meal saved successfully!');
     } catch (error) {
       Alert.alert('Error', 'Failed to save meal');
     }
   };
 
+  const handleEditMeal = (meal: MealData) => {
+    setSelectedMeal(meal);
+    setIsEditModalVisible(true);
+  };
+
+  const handleUpdateMeal = async (updatedMeal: MealData) => {
+    try {
+      await saveMealEntry(updatedMeal);
+      await loadData(); // Refresh data
+      Alert.alert('Success', 'Meal updated successfully!');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update meal');
+    }
+  };
+
+  const handleDeleteMeal = async (mealId: string) => {
+    try {
+      const { deleteMealEntry } = await import('../mealStorage');
+      await deleteMealEntry(mealId);
+      await loadData(); // Refresh data
+      Alert.alert('Success', 'Meal deleted successfully!');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to delete meal');
+    }
+  };
+
+  const handleSaveGoals = async (goals: UserGoals) => {
+    setUserGoals(goals);
+    await loadData(); // Refresh all data
+  };
+
   const calculateProgress = () => {
-    const dailyGoal = 2000;
-    const progress = (totalCalories / dailyGoal) * 100;
+    const progress = (nutrition.calories / userGoals.calorieTarget) * 100;
     return {
       percentage: Math.min(progress, 100),
-      remaining: Math.max(dailyGoal - totalCalories, 0)
+      remaining: Math.max(userGoals.calorieTarget - nutrition.calories, 0)
     };
   };
 
   const { percentage, remaining } = calculateProgress();
+
+  if (isHistoryVisible) {
+    return <MealHistory />;
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -95,31 +194,42 @@ export default function HomeScreen() {
             </Text>
             <Text style={styles.greeting}>Hello, Ranjitha 👋</Text>
           </View>
-          <TouchableOpacity style={styles.profileButton}>
-            <Text style={styles.profileInitial}>R</Text>
-          </TouchableOpacity>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity 
+              style={styles.headerButton} 
+              onPress={() => setIsHistoryVisible(true)}
+            >
+              <Ionicons name="time-outline" size={22} color="#666" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.profileButton}>
+              <Text style={styles.profileInitial}>R</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Daily Summary Card */}
-        <View style={styles.summaryCard}>
+        <TouchableOpacity 
+          style={styles.summaryCard}
+          onPress={() => setIsGoalModalVisible(true)}
+        >
           <View style={styles.calorieCircle}>
-            <Text style={styles.calorieCount}>{totalCalories}</Text>
+            <Text style={styles.calorieCount}>{nutrition.calories}</Text>
             <Text style={styles.calorieLabel}>calories</Text>
           </View>
           <View style={styles.goalInfo}>
-            <Text style={styles.goalText}>Daily Goal: 2,000 kcal</Text>
+            <Text style={styles.goalText}>Daily Goal: {userGoals.calorieTarget.toLocaleString()} kcal</Text>
             <View style={styles.progressBarContainer}>
               <View style={[styles.progressBar, { width: `${percentage}%` }]} />
             </View>
-            <Text style={styles.remainingText}>{remaining} kcal remaining</Text>
+            <Text style={styles.remainingText}>{remaining.toLocaleString()} kcal remaining</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Quick Actions */}
         <View style={styles.quickActions}>
           <TouchableOpacity 
             style={styles.addMealButton}
-            onPress={() => setIsModalVisible(true)}>
+            onPress={() => setIsAddModalVisible(true)}>
             <View style={styles.buttonIcon}>
               <Text style={styles.buttonIconText}>📝</Text>
             </View>
@@ -136,8 +246,23 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Barcode Scanner Button */}
+        <TouchableOpacity 
+          style={styles.barcodeButton}
+          onPress={() => setIsBarcodeModalVisible(true)}
+        >
+          <Ionicons name="barcode-outline" size={24} color="#1a1a1a" />
+          <Text style={styles.barcodeButtonText}>Scan Food Barcode</Text>
+        </TouchableOpacity>
+
         {/* Nutrition Overview */}
-        <Text style={styles.sectionTitle}>Nutrition Overview</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Nutrition Overview</Text>
+          <TouchableOpacity onPress={() => setIsGoalModalVisible(true)}>
+            <Text style={styles.sectionAction}>Set Goals</Text>
+          </TouchableOpacity>
+        </View>
+
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false}
@@ -147,56 +272,140 @@ export default function HomeScreen() {
             <View style={[styles.macroIcon, { backgroundColor: '#E8F5E9' }]}>
               <Text style={styles.macroIconText}>🥩</Text>
             </View>
-            <Text style={styles.macroValue}>65g</Text>
+            <Text style={styles.macroValue}>{nutrition.protein}g</Text>
             <Text style={styles.macroLabel}>Protein</Text>
-            <Text style={styles.macroProgress}>81%</Text>
+            <Text style={styles.macroProgress}>{nutrition.proteinPercentage}%</Text>
+            <View style={styles.microProgressBar}>
+              <View 
+                style={[
+                  styles.microProgress, 
+                  { width: `${Math.min(nutrition.proteinPercentage, 100)}%` }
+                ]} 
+              />
+            </View>
           </View>
 
           <View style={styles.macroCard}>
             <View style={[styles.macroIcon, { backgroundColor: '#E3F2FD' }]}>
               <Text style={styles.macroIconText}>🍚</Text>
             </View>
-            <Text style={styles.macroValue}>180g</Text>
+            <Text style={styles.macroValue}>{nutrition.carbs}g</Text>
             <Text style={styles.macroLabel}>Carbs</Text>
-            <Text style={styles.macroProgress}>72%</Text>
+            <Text style={styles.macroProgress}>{nutrition.carbsPercentage}%</Text>
+            <View style={styles.microProgressBar}>
+              <View 
+                style={[
+                  styles.microProgress, 
+                  { width: `${Math.min(nutrition.carbsPercentage, 100)}%` }
+                ]} 
+              />
+            </View>
           </View>
 
           <View style={styles.macroCard}>
             <View style={[styles.macroIcon, { backgroundColor: '#FFF3E0' }]}>
               <Text style={styles.macroIconText}>🥑</Text>
             </View>
-            <Text style={styles.macroValue}>45g</Text>
+            <Text style={styles.macroValue}>{nutrition.fat}g</Text>
             <Text style={styles.macroLabel}>Fats</Text>
-            <Text style={styles.macroProgress}>64%</Text>
+            <Text style={styles.macroProgress}>{nutrition.fatPercentage}%</Text>
+            <View style={styles.microProgressBar}>
+              <View 
+                style={[
+                  styles.microProgress, 
+                  { width: `${Math.min(nutrition.fatPercentage, 100)}%` }
+                ]} 
+              />
+            </View>
           </View>
         </ScrollView>
 
         {/* Today's Meals */}
-        <Text style={styles.sectionTitle}>Today's Meals</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Today's Meals</Text>
+          <TouchableOpacity onPress={() => setIsHistoryVisible(true)}>
+            <Text style={styles.sectionAction}>View All</Text>
+          </TouchableOpacity>
+        </View>
+        
         <View style={styles.mealsContainer}>
-          {meals.map((meal, index) => (
-            <TouchableOpacity key={index} style={styles.mealItem}>
-              <View style={[styles.mealIcon, { backgroundColor: '#F3E5F5' }]}>
-                <Text style={styles.mealIconText}>🍽️</Text>
-              </View>
-              <View style={styles.mealInfo}>
-                <Text style={styles.mealTitle}>{meal.food}</Text>
-                <Text style={styles.mealDetails}>{meal.notes}</Text>
-                <Text style={styles.mealCalories}>{meal.calories} kcal</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#2E7D32" />
+            </View>
+          ) : todayMeals.length === 0 ? (
+            <View style={styles.emptyMealsContainer}>
+              <Text style={styles.emptyMealsText}>No meals logged today</Text>
+              <Text style={styles.emptyMealsSubtext}>Tap "Log Meal" to add your first meal</Text>
+            </View>
+          ) : (
+            todayMeals.map((meal, index) => (
+              <TouchableOpacity 
+                key={meal.id || index.toString()} 
+                style={styles.mealItem}
+                onPress={() => handleEditMeal(meal)}
+              >
+                <View style={[styles.mealIcon, { backgroundColor: '#F3E5F5' }]}>
+                  <Text style={styles.mealIconText}>🍽️</Text>
+                </View>
+                <View style={styles.mealInfo}>
+                  <Text style={styles.mealTitle}>{meal.food}</Text>
+                  <Text style={styles.mealDetails}>{meal.notes || 'No notes'}</Text>
+                  <View style={styles.mealMacros}>
+                    <Text style={styles.mealCalories}>{meal.calories} kcal</Text>
+                    {meal.protein > 0 && (
+                      <Text style={styles.mealMacroText}>P: {meal.protein}g</Text>
+                    )}
+                    {meal.carbs > 0 && (
+                      <Text style={styles.mealMacroText}>C: {meal.carbs}g</Text>
+                    )}
+                    {meal.fat > 0 && (
+                      <Text style={styles.mealMacroText}>F: {meal.fat}g</Text>
+                    )}
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
+              </TouchableOpacity>
+            ))
+          )}
         </View>
       </ScrollView>
 
+      {/* Modals */}
       <ImageDetectionModal
-        visible={isModalVisible}
+        visible={isAddModalVisible}
         onClose={() => {
-          setIsModalVisible(false);
+          setIsAddModalVisible(false);
           setCapturedImage(null);
         }}
         imageUri={capturedImage}
         onSave={handleSaveMeal}
+      />
+
+      <EditMealModal
+        visible={isEditModalVisible}
+        onClose={() => {
+          setIsEditModalVisible(false);
+          setSelectedMeal(null);
+        }}
+        mealData={selectedMeal}
+        onSave={handleUpdateMeal}
+        onDelete={handleDeleteMeal}
+      />
+
+      <GoalSettingsModal
+        visible={isGoalModalVisible}
+        onClose={() => setIsGoalModalVisible(false)}
+        onSave={handleSaveGoals}
+      />
+
+      <BarcodeScanner
+        visible={isBarcodeModalVisible}
+        onClose={() => setIsBarcodeModalVisible(false)}
+        onProductScanned={(product) => {
+          setIsBarcodeModalVisible(false);
+          handleSaveMeal(product);
+        }}
       />
     </SafeAreaView>
   );
@@ -224,6 +433,19 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     color: '#1a1a1a',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
   },
   profileButton: {
     width: 44,
@@ -303,7 +525,7 @@ const styles = StyleSheet.create({
   quickActions: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    marginBottom: 25,
+    marginBottom: 15,
   },
   addMealButton: {
     flex: 1,
@@ -345,6 +567,25 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  barcodeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F5F5',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+  },
+  barcodeButtonText: {
+    marginLeft: 10,
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#1a1a1a',
+  },
   buttonIcon: {
     width: 36,
     height: 36,
@@ -362,12 +603,22 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#1a1a1a',
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 15,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1a1a1a',
-    paddingHorizontal: 20,
-    marginBottom: 15,
+  },
+  sectionAction: {
+    fontSize: 14,
+    color: '#2E7D32',
+    fontWeight: '500',
   },
   macrosScrollView: {
     paddingLeft: 20,
@@ -417,9 +668,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#2E7D32',
     fontWeight: '500',
+    marginBottom: 4,
+  },
+  microProgressBar: {
+    height: 4,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  microProgress: {
+    height: 4,
+    backgroundColor: '#2E7D32',
+    borderRadius: 2,
   },
   mealsContainer: {
     paddingHorizontal: 20,
+    paddingBottom: 30,
   },
   mealItem: {
     flexDirection: 'row',
@@ -463,11 +727,43 @@ const styles = StyleSheet.create({
   mealDetails: {
     fontSize: 14,
     color: '#666666',
-    marginBottom: 2,
+    marginBottom: 4,
+  },
+  mealMacros: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
   mealCalories: {
     fontSize: 13,
     color: '#2E7D32',
     fontWeight: '500',
+    marginRight: 8,
+  },
+  mealMacroText: {
+    fontSize: 13,
+    color: '#666',
+    marginRight: 8,
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyMealsContainer: {
+    padding: 30,
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    marginVertical: 10,
+  },
+  emptyMealsText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 8,
+  },
+  emptyMealsSubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
   },
 });
