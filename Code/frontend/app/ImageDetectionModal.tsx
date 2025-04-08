@@ -1,5 +1,4 @@
-// ImageDetectionModal.js
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   Modal,
   View,
@@ -13,9 +12,30 @@ import {
   ScrollView,
   Keyboard,
   TouchableWithoutFeedback,
+  Alert,
 } from 'react-native';
 
-export const ImageDetectionModal = ({ 
+// Define interfaces for TypeScript
+export interface MealEntry {
+  id: string;
+  food: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  notes: string;
+  image?: string;
+  timestamp: string;
+}
+
+interface ImageDetectionModalProps {
+  visible: boolean;
+  onClose: () => void;
+  imageUri: string | null;
+  onSave: (mealEntry: MealEntry) => void;
+}
+
+const ImageDetectionModal: React.FC<ImageDetectionModalProps> = ({ 
   visible, 
   onClose, 
   imageUri,
@@ -23,19 +43,41 @@ export const ImageDetectionModal = ({
 }) => {
   const [detectedFood, setDetectedFood] = useState('');
   const [calories, setCalories] = useState('');
+  const [protein, setProtein] = useState('');
+  const [carbs, setCarbs] = useState('');
+  const [fat, setFat] = useState('');
   const [notes, setNotes] = useState('');
 
   const handleSave = () => {
+    // Validate
+    if (!detectedFood.trim()) {
+      Alert.alert('Error', 'Please enter a food name');
+      return;
+    }
+
     // Create meal entry object
-    const mealEntry = {
+    const mealEntry: MealEntry = {
+      id: Date.now().toString(),
       food: detectedFood,
       calories: parseInt(calories) || 0,
+      protein: parseInt(protein) || 0,
+      carbs: parseInt(carbs) || 0,
+      fat: parseInt(fat) || 0,
       notes: notes,
-      image: imageUri,
+      image: imageUri || undefined,
       timestamp: new Date().toISOString(),
     };
 
     onSave(mealEntry);
+    
+    // Reset form
+    setDetectedFood('');
+    setCalories('');
+    setProtein('');
+    setCarbs('');
+    setFat('');
+    setNotes('');
+    
     onClose();
   };
 
@@ -58,7 +100,7 @@ export const ImageDetectionModal = ({
         >
           <View style={styles.modalContent}>
             <View style={styles.header}>
-              <Text style={styles.headerTitle}>Detected Food</Text>
+              <Text style={styles.headerTitle}>Add Food</Text>
               <TouchableOpacity onPress={onClose} style={styles.closeButton}>
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
@@ -97,6 +139,48 @@ export const ImageDetectionModal = ({
                     returnKeyType="next"
                     blurOnSubmit={false}
                   />
+                </View>
+
+                <Text style={styles.macroTitle}>Macronutrients (optional)</Text>
+                <View style={styles.macroRow}>
+                  <View style={[styles.inputContainer, styles.macroInput]}>
+                    <Text style={styles.label}>Protein (g)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={protein}
+                      onChangeText={setProtein}
+                      placeholder="0"
+                      keyboardType="numeric"
+                      returnKeyType="next"
+                      blurOnSubmit={false}
+                    />
+                  </View>
+                  
+                  <View style={[styles.inputContainer, styles.macroInput]}>
+                    <Text style={styles.label}>Carbs (g)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={carbs}
+                      onChangeText={setCarbs}
+                      placeholder="0"
+                      keyboardType="numeric"
+                      returnKeyType="next"
+                      blurOnSubmit={false}
+                    />
+                  </View>
+                  
+                  <View style={[styles.inputContainer, styles.macroInput]}>
+                    <Text style={styles.label}>Fat (g)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={fat}
+                      onChangeText={setFat}
+                      placeholder="0"
+                      keyboardType="numeric"
+                      returnKeyType="next"
+                      blurOnSubmit={false}
+                    />
+                  </View>
                 </View>
 
                 <View style={styles.inputContainer}>
@@ -172,6 +256,22 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: 16,
   },
+  macroTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  macroRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  macroInput: {
+    flex: 1,
+    marginRight: 8,
+  },
   label: {
     fontSize: 14,
     color: '#666666',
@@ -202,3 +302,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+export default ImageDetectionModal;
