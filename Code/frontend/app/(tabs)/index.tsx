@@ -179,7 +179,7 @@ export default function HomeScreen() {
   const { percentage, remaining } = calculateProgress();
 
   if (isHistoryVisible) {
-    return <MealHistory />;
+    return <MealHistory onBack={() => setIsHistoryVisible(false)} />;
   }
 
   return (
