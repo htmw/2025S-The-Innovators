@@ -7,32 +7,12 @@ import {
   SafeAreaView,
   Alert,
   ActivityIndicator,
-  Modal,
-  Platform
+  Modal
 } from 'react-native';
-import * as Camera from 'expo-camera';
+import { BarCodeScanner } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 
 // Define interfaces for TypeScript
-interface BarcodeApiResponse {
-  product: {
-    title: string;
-    description?: string;
-    brand?: string | null;
-    category?: string[];
-    nutrition_facts?: string;
-    images?: string[];
-    barcode_formats?: {
-      upc_a?: string;
-      ean_13?: string;
-    };
-    online_stores?: Array<{
-      name: string;
-      price: string;
-    }>;
-  };
-}
-
 interface MealEntry {
   id: string;
   food: string;
@@ -50,214 +30,113 @@ interface BarcodeScannerProps {
   onProductScanned: (mealEntry: MealEntry) => void;
 }
 
-// Fallback mock data in case API fails
+// Simple mock database for common products
 const mockFoodDatabase: Record<string, any> = {
   '5449000000996': { name: 'Coca-Cola', calories: 139, protein: 0, carbs: 35, fat: 0 },
   '5000112637922': { name: 'Cadbury Dairy Milk', calories: 240, protein: 4, carbs: 25, fat: 14 },
-  '027917009711': { name: 'Vitafusion MultiVites', calories: 150, protein: 0, carbs: 100, fat: 0 }
+  '027917009711': { name: 'Vitafusion MultiVites', calories: 15, protein: 0, carbs: 4, fat: 0 }
 };
 
 const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ visible, onClose, onProductScanned }) => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
-  const [scanning, setScanning] = useState(true);
   const [loading, setLoading] = useState(false);
 
+  // Check camera permissions when modal becomes visible
   useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-      if (status !== 'granted') {
-        Alert.alert(
-          'Camera Permission',
-          'Please grant camera permission to use the barcode scanner',
-          [{ text: 'OK', onPress: () => onClose() }]
-        );
+    let isMounted = true;
+    
+    const getPermission = async () => {
+      try {
+        // First try using the Camera module for permissions
+        const { status } = await BarCodeScanner.requestPermissionsAsync();
+        
+        // Only update state if component is still mounted
+        if (isMounted) {
+          console.log("Camera permission status:", status);
+          setHasPermission(status === 'granted');
+          
+          if (status !== 'granted') {
+            Alert.alert(
+              'Camera Permission',
+              'Please grant camera permission to use the barcode scanner',
+              [{ text: 'OK', onPress: onClose }]
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Error requesting camera permission:", err);
+        
+        // Only update state if component is still mounted
+        if (isMounted) {
+          setHasPermission(false);
+          Alert.alert('Camera Error', 'Failed to access camera.', [{ text: 'OK', onPress: onClose }]);
+        }
       }
-    })();
-  }, [onClose]);
+    };
 
-  const parseNutritionFacts = (nutritionText: string | undefined): { calories: number, protein: number, carbs: number, fat: number } => {
-    if (!nutritionText) {
-      return { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    if (visible) {
+      getPermission();
+    } else {
+      // Reset state when modal is closed
+      setScanned(false);
+      setLoading(false);
     }
     
-    try {
-      // Extract data from strings like "Energy 150 kcal, Carbohydrates 100 g, Sugars 75 g, Salt 1.25 g."
-      const caloriesMatch = nutritionText.match(/Energy\s+(\d+)\s+kcal/i);
-      const carbsMatch = nutritionText.match(/Carbohydrates\s+(\d+)\s+g/i);
-      const proteinMatch = nutritionText.match(/Protein\s+(\d+)\s+g/i);
-      const fatMatch = nutritionText.match(/Fat\s+(\d+)\s+g/i);
-      
-      return {
-        calories: caloriesMatch ? parseInt(caloriesMatch[1]) : 0,
-        carbs: carbsMatch ? parseInt(carbsMatch[1]) : 0,
-        protein: proteinMatch ? parseInt(proteinMatch[1]) : 0,
-        fat: fatMatch ? parseInt(fatMatch[1]) : 0
-      };
-    } catch (error) {
-      console.error('Error parsing nutrition facts:', error);
-      return { calories: 0, protein: 0, carbs: 0, fat: 0 };
-    }
-  };
+    // Cleanup function to prevent state updates if unmounted
+    return () => {
+      isMounted = false;
+    };
+  }, [visible]);
 
-  const fetchProductFromAPI = async (barcode: string): Promise<BarcodeApiResponse | null> => {
-    try {
-      const options = {
-        method: 'GET',
-        headers: {
-          'x-rapidapi-host': 'barcodes1.p.rapidapi.com',
-          'x-rapidapi-key': '87b088a185msh6dc197816329727p13c48ajsnb75d08fdfdf6'
-        }
-      };
-
-      const response = await fetch(`https://barcodes1.p.rapidapi.com/?query=${barcode}`, options);
-      
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error fetching product data:', error);
-      return null;
-    }
-  };
-
-  const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
-    if (!scanning) return;
+  // Handle barcode scanning
+  const handleBarCodeScanned = async ({ data }: { type: string; data: string }) => {
+    if (scanned) return;
     
     setScanned(true);
-    setScanning(false);
     setLoading(true);
     
     try {
-      // Fetch product data from the API
-      const apiResponse = await fetchProductFromAPI(data);
+      // Check if product exists in our mock database
+      const product = mockFoodDatabase[data];
       
-      if (apiResponse && apiResponse.product) {
-        const { product } = apiResponse;
-        
-        // Parse nutrition facts from the API
-        const nutrition = parseNutritionFacts(product.nutrition_facts);
-        
-        // Create product notes with all relevant information
-        let productNotes = `Scanned barcode: ${data}\n`;
-        if (product.brand) productNotes += `Brand: ${product.brand}\n`;
-        if (product.category && product.category.length > 0) productNotes += `Category: ${product.category.join(', ')}\n`;
-        if (product.online_stores && product.online_stores.length > 0) {
-          productNotes += 'Available at: ';
-          product.online_stores.forEach((store, index) => {
-            productNotes += `${store.name} (${store.price})${index < product.online_stores!.length - 1 ? ', ' : ''}`;
-          });
-          productNotes += '\n';
-        }
-        if (product.description) {
-          // Limit description length
-          const shortDesc = product.description.length > 150 
-            ? product.description.substring(0, 150) + '...' 
-            : product.description;
-          productNotes += `Description: ${shortDesc}`;
-        }
-        
+      if (product) {
         // Create meal entry from product data
         const mealEntry: MealEntry = {
           id: Date.now().toString(),
-          food: product.title || 'Unknown Product',
-          calories: nutrition.calories,
-          protein: nutrition.protein,
-          carbs: nutrition.carbs,
-          fat: nutrition.fat,
-          notes: productNotes,
+          food: product.name,
+          calories: product.calories,
+          protein: product.protein,
+          carbs: product.carbs,
+          fat: product.fat,
+          notes: `Scanned barcode: ${data}`,
           timestamp: new Date().toISOString(),
         };
         
         onProductScanned(mealEntry);
       } else {
-        // Fallback to mock database if API fails
-        const mockProduct = mockFoodDatabase[data];
-        
-        if (mockProduct) {
-          const mealEntry: MealEntry = {
-            id: Date.now().toString(),
-            food: mockProduct.name,
-            calories: mockProduct.calories,
-            protein: mockProduct.protein,
-            carbs: mockProduct.carbs,
-            fat: mockProduct.fat,
-            notes: `Scanned barcode: ${data} (from local database)`,
-            timestamp: new Date().toISOString(),
-          };
-          
-          onProductScanned(mealEntry);
-        } else {
-          // Neither API nor mock database has the product
-          Alert.alert(
-            'Product Not Found',
-            `No product found for barcode: ${data}`,
-            [
-              { 
-                text: 'Try Again', 
-                onPress: () => {
-                  setScanned(false);
-                  setScanning(true);
-                  setLoading(false);
-                } 
-              },
-              { 
-                text: 'Close', 
-                onPress: () => onClose() 
-              }
-            ]
-          );
-        }
+        // Product not found
+        Alert.alert(
+          'Product Not Found',
+          `No product found for barcode: ${data}`,
+          [
+            { text: 'Try Again', onPress: () => setScanned(false) },
+            { text: 'Close', onPress: onClose }
+          ]
+        );
       }
     } catch (error) {
       console.error('Error in barcode scanning process:', error);
-      Alert.alert(
-        'Error',
-        'Failed to retrieve product information',
-        [
-          { 
-            text: 'Try Again', 
-            onPress: () => {
-              setScanned(false);
-              setScanning(true);
-              setLoading(false);
-            } 
-          },
-          { 
-            text: 'Close', 
-            onPress: () => onClose() 
-          }
-        ]
-      );
+      Alert.alert('Error', 'Failed to retrieve product information');
+      setScanned(false);
     } finally {
       setLoading(false);
     }
   };
 
-  const renderCamera = () => {
-    return (
-      <View style={styles.cameraContainer}>
-        <Camera.BarCodeScanner
-          onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-          style={styles.camera}
-          barCodeTypes={['ean13', 'ean8', 'upc_e', 'upc_a']}
-        />
-        
-        <View style={styles.overlay}>
-          <View style={styles.scanWindow} />
-        </View>
-        
-        <View style={styles.helpTextContainer}>
-          <Text style={styles.helpText}>
-            Align barcode within the square
-          </Text>
-        </View>
-      </View>
-    );
+  // For testing without a real barcode
+  const scanTestBarcode = () => {
+    handleBarCodeScanned({ type: 'TEST', data: '5449000000996' });
   };
 
   return (
@@ -267,6 +146,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ visible, onClose, onPro
       onRequestClose={onClose}
     >
       <SafeAreaView style={styles.container}>
+        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <Ionicons name="close" size={28} color="#000" />
@@ -275,40 +155,59 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ visible, onClose, onPro
           <View style={{ width: 40 }} />
         </View>
         
+        {/* Content */}
         {hasPermission === null ? (
-          <View style={styles.loadingContainer}>
+          // Loading state while checking permissions
+          <View style={styles.centeredContainer}>
             <ActivityIndicator size="large" color="#2E7D32" />
             <Text style={styles.statusText}>Requesting camera permission...</Text>
           </View>
         ) : hasPermission === false ? (
+          // No permission state
           <View style={styles.centeredContainer}>
-            <Text style={styles.errorText}>No access to camera</Text>
+            <Text style={styles.errorText}>Camera permission not granted</Text>
             <TouchableOpacity 
-              style={styles.retryButton}
-              onPress={onClose}
+              style={styles.button}
+              onPress={scanTestBarcode}
             >
-              <Text style={styles.retryButtonText}>Close</Text>
+              <Text style={styles.buttonText}>Use Test Barcode</Text>
             </TouchableOpacity>
           </View>
         ) : loading ? (
-          <View style={styles.loadingContainer}>
+          // Loading state while processing barcode
+          <View style={styles.centeredContainer}>
             <ActivityIndicator size="large" color="#2E7D32" />
-            <Text style={styles.statusText}>Searching for product...</Text>
+            <Text style={styles.statusText}>Processing barcode...</Text>
           </View>
         ) : (
-          renderCamera()
+          // Camera view
+          <View style={styles.cameraContainer}>
+            <BarCodeScanner
+              onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+              style={styles.camera}
+              barCodeTypes={['ean13', 'ean8', 'upc_e', 'upc_a']}
+            />
+            
+            <View style={styles.overlay}>
+              <View style={styles.scanWindow} />
+            </View>
+            
+            <View style={styles.helpTextContainer}>
+              <Text style={styles.helpText}>
+                Align barcode within the square
+              </Text>
+            </View>
+          </View>
         )}
         
+        {/* Bottom buttons */}
         {scanned && !loading && (
           <View style={styles.bottomContainer}>
             <TouchableOpacity
-              style={styles.scanAgainButton}
-              onPress={() => {
-                setScanned(false);
-                setScanning(true);
-              }}
+              style={styles.button}
+              onPress={() => setScanned(false)}
             >
-              <Text style={styles.scanAgainButtonText}>Scan Again</Text>
+              <Text style={styles.buttonText}>Scan Again</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -377,27 +276,16 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#FFF',
   },
-  scanAgainButton: {
+  button: {
     backgroundColor: '#2E7D32',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
   },
-  scanAgainButtonText: {
+  buttonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFF',
-  },
-  statusText: {
-    marginTop: 20,
-    fontSize: 16,
-    color: '#666',
   },
   centeredContainer: {
     flex: 1,
@@ -406,23 +294,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     padding: 20,
   },
+  statusText: {
+    marginTop: 20,
+    fontSize: 16,
+    color: '#666',
+  },
   errorText: {
     fontSize: 18,
     color: '#E53935',
     marginBottom: 20,
     textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: '#2E7D32',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    width: '80%',
-  },
-  retryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });
 
