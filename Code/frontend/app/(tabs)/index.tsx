@@ -13,14 +13,15 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-// Import with default exports
 import ImageDetectionModal from '../ImageDetectionModal';
 import { saveMealEntry, getMealEntries, calculateDailyNutrition, getUserGoals } from '../mealStorage';
-import EditMealModal, { MealData } from '../EditMealModal'; // Changed to default importimport GoalSettingsModal, { UserGoals } from '../GoalSettingsModal';
+import EditMealModal, { MealData } from '../EditMealModal';
+import GoalSettingsModal, { UserGoals } from '../GoalSettingsModal';
 import BarcodeScanner from '../BarcodeScanner';
 import MealHistory from '../MealHistory';
-import GoalSettingsModal from '../GoalSettingsModal'; // Fixed import for GoalSettingsModal
-import { UserGoals } from '../GoalSettingsModal';
+import WeeklyProgressReport from '../WeeklyProgressReport';
+import SettingsScreen from '../SettingsScreen';
+import { useTheme } from '../ThemeContext';
 
 // Define TypeScript interfaces
 interface NutritionData {
@@ -34,11 +35,14 @@ interface NutritionData {
 }
 
 export default function HomeScreen() {
+  const { theme, isDarkMode } = useTheme();
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isGoalModalVisible, setIsGoalModalVisible] = useState(false);
   const [isBarcodeModalVisible, setIsBarcodeModalVisible] = useState(false);
   const [isHistoryVisible, setIsHistoryVisible] = useState(false);
+  const [isWeeklyReportVisible, setIsWeeklyReportVisible] = useState(false);
+  const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [selectedMeal, setSelectedMeal] = useState<MealData | null>(null);
   const [meals, setMeals] = useState<MealData[]>([]);
@@ -182,84 +186,104 @@ export default function HomeScreen() {
     return <MealHistory onBack={() => setIsHistoryVisible(false)} />;
   }
 
+  if (isWeeklyReportVisible) {
+    return <WeeklyProgressReport onBack={() => setIsWeeklyReportVisible(false)} />;
+  }
+
+  if (isSettingsVisible) {
+    return <SettingsScreen onBack={() => setIsSettingsVisible(false)} />;
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Modern Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: theme.background }]}>
           <View>
-            <Text style={styles.headerDate}>
+            <Text style={[styles.headerDate, { color: theme.textSecondary }]}>
               {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
             </Text>
-            <Text style={styles.greeting}>Hello, Ranjitha 👋</Text>
+            <Text style={[styles.greeting, { color: theme.text }]}>Hello, Ranjitha 👋</Text>
           </View>
           <View style={styles.headerButtons}>
             <TouchableOpacity 
-              style={styles.headerButton} 
+              style={[styles.headerButton, { backgroundColor: theme.placeholder }]} 
+              onPress={() => setIsWeeklyReportVisible(true)}
+            >
+              <Ionicons name="stats-chart" size={22} color={theme.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.headerButton, { backgroundColor: theme.placeholder }]} 
               onPress={() => setIsHistoryVisible(true)}
             >
-              <Ionicons name="time-outline" size={22} color="#666" />
+              <Ionicons name="time-outline" size={22} color={theme.textSecondary} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.profileButton}>
-              <Text style={styles.profileInitial}>R</Text>
+            <TouchableOpacity 
+              style={[styles.headerButton, { backgroundColor: theme.placeholder }]}
+              onPress={() => setIsSettingsVisible(true)}
+            >
+              <Ionicons name="settings-outline" size={22} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Daily Summary Card */}
         <TouchableOpacity 
-          style={styles.summaryCard}
+          style={[styles.summaryCard, { backgroundColor: theme.card }]}
           onPress={() => setIsGoalModalVisible(true)}
         >
-          <View style={styles.calorieCircle}>
-            <Text style={styles.calorieCount}>{nutrition.calories}</Text>
-            <Text style={styles.calorieLabel}>calories</Text>
+          <View style={[styles.calorieCircle, { backgroundColor: theme.placeholder }]}>
+            <Text style={[styles.calorieCount, { color: theme.primary }]}>{nutrition.calories}</Text>
+            <Text style={[styles.calorieLabel, { color: theme.textSecondary }]}>calories</Text>
           </View>
           <View style={styles.goalInfo}>
-            <Text style={styles.goalText}>Daily Goal: {userGoals.calorieTarget.toLocaleString()} kcal</Text>
-            <View style={styles.progressBarContainer}>
-              <View style={[styles.progressBar, { width: `${percentage}%` }]} />
+            <Text style={[styles.goalText, { color: theme.textSecondary }]}>Daily Goal: {userGoals.calorieTarget.toLocaleString()} kcal</Text>
+            <View style={[styles.progressBarContainer, { backgroundColor: theme.placeholder }]}>
+              <View style={[styles.progressBar, { width: `${percentage}%`, backgroundColor: theme.primary }]} />
             </View>
-            <Text style={styles.remainingText}>{remaining.toLocaleString()} kcal remaining</Text>
+            <Text style={[styles.remainingText, { color: theme.primary }]}>{remaining.toLocaleString()} kcal remaining</Text>
           </View>
         </TouchableOpacity>
 
         {/* Quick Actions */}
         <View style={styles.quickActions}>
           <TouchableOpacity 
-            style={styles.addMealButton}
+            style={[styles.addMealButton, { backgroundColor: theme.card }]}
             onPress={() => setIsAddModalVisible(true)}>
-            <View style={styles.buttonIcon}>
+            <View style={[styles.buttonIcon, { backgroundColor: theme.placeholder }]}>
               <Text style={styles.buttonIconText}>📝</Text>
             </View>
-            <Text style={styles.buttonText}>Log Meal</Text>
+            <Text style={[styles.buttonText, { color: theme.text }]}>Log Meal</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={styles.cameraButton}
+            style={[styles.cameraButton, { backgroundColor: theme.card }]}
             onPress={handleCameraAccess}>
-            <View style={styles.buttonIcon}>
+            <View style={[styles.buttonIcon, { backgroundColor: theme.placeholder }]}>
               <Text style={styles.buttonIconText}>📸</Text>
             </View>
-            <Text style={styles.buttonText}>Snap Meal</Text>
+            <Text style={[styles.buttonText, { color: theme.text }]}>Snap Meal</Text>
           </TouchableOpacity>
         </View>
 
         {/* Barcode Scanner Button */}
         <TouchableOpacity 
-          style={styles.barcodeButton}
+          style={[styles.barcodeButton, { 
+            backgroundColor: theme.placeholder, 
+            borderColor: isDarkMode ? theme.border : '#E0E0E0' 
+          }]}
           onPress={() => setIsBarcodeModalVisible(true)}
         >
-          <Ionicons name="barcode-outline" size={24} color="#1a1a1a" />
-          <Text style={styles.barcodeButtonText}>Scan Food Barcode</Text>
+          <Ionicons name="barcode-outline" size={24} color={theme.text} />
+          <Text style={[styles.barcodeButtonText, { color: theme.text }]}>Scan Food Barcode</Text>
         </TouchableOpacity>
 
         {/* Nutrition Overview */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Nutrition Overview</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Nutrition Overview</Text>
           <TouchableOpacity onPress={() => setIsGoalModalVisible(true)}>
-            <Text style={styles.sectionAction}>Set Goals</Text>
+            <Text style={[styles.sectionAction, { color: theme.primary }]}>Set Goals</Text>
           </TouchableOpacity>
         </View>
 
@@ -268,52 +292,52 @@ export default function HomeScreen() {
           showsHorizontalScrollIndicator={false}
           style={styles.macrosScrollView}
         >
-          <View style={styles.macroCard}>
-            <View style={[styles.macroIcon, { backgroundColor: '#E8F5E9' }]}>
+          <View style={[styles.macroCard, { backgroundColor: theme.card }]}>
+            <View style={[styles.macroIcon, { backgroundColor: isDarkMode ? '#2D3B2D' : '#E8F5E9' }]}>
               <Text style={styles.macroIconText}>🥩</Text>
             </View>
-            <Text style={styles.macroValue}>{nutrition.protein}g</Text>
-            <Text style={styles.macroLabel}>Protein</Text>
-            <Text style={styles.macroProgress}>{nutrition.proteinPercentage}%</Text>
-            <View style={styles.microProgressBar}>
+            <Text style={[styles.macroValue, { color: theme.text }]}>{nutrition.protein}g</Text>
+            <Text style={[styles.macroLabel, { color: theme.textSecondary }]}>Protein</Text>
+            <Text style={[styles.macroProgress, { color: theme.primary }]}>{nutrition.proteinPercentage}%</Text>
+            <View style={[styles.microProgressBar, { backgroundColor: theme.placeholder }]}>
               <View 
                 style={[
                   styles.microProgress, 
-                  { width: `${Math.min(nutrition.proteinPercentage, 100)}%` }
+                  { width: `${Math.min(nutrition.proteinPercentage, 100)}%`, backgroundColor: theme.primary }
                 ]} 
               />
             </View>
           </View>
 
-          <View style={styles.macroCard}>
-            <View style={[styles.macroIcon, { backgroundColor: '#E3F2FD' }]}>
+          <View style={[styles.macroCard, { backgroundColor: theme.card }]}>
+            <View style={[styles.macroIcon, { backgroundColor: isDarkMode ? '#263238' : '#E3F2FD' }]}>
               <Text style={styles.macroIconText}>🍚</Text>
             </View>
-            <Text style={styles.macroValue}>{nutrition.carbs}g</Text>
-            <Text style={styles.macroLabel}>Carbs</Text>
-            <Text style={styles.macroProgress}>{nutrition.carbsPercentage}%</Text>
-            <View style={styles.microProgressBar}>
+            <Text style={[styles.macroValue, { color: theme.text }]}>{nutrition.carbs}g</Text>
+            <Text style={[styles.macroLabel, { color: theme.textSecondary }]}>Carbs</Text>
+            <Text style={[styles.macroProgress, { color: theme.primary }]}>{nutrition.carbsPercentage}%</Text>
+            <View style={[styles.microProgressBar, { backgroundColor: theme.placeholder }]}>
               <View 
                 style={[
                   styles.microProgress, 
-                  { width: `${Math.min(nutrition.carbsPercentage, 100)}%` }
+                  { width: `${Math.min(nutrition.carbsPercentage, 100)}%`, backgroundColor: theme.primary }
                 ]} 
               />
             </View>
           </View>
 
-          <View style={styles.macroCard}>
-            <View style={[styles.macroIcon, { backgroundColor: '#FFF3E0' }]}>
+          <View style={[styles.macroCard, { backgroundColor: theme.card }]}>
+            <View style={[styles.macroIcon, { backgroundColor: isDarkMode ? '#3E2723' : '#FFF3E0' }]}>
               <Text style={styles.macroIconText}>🥑</Text>
             </View>
-            <Text style={styles.macroValue}>{nutrition.fat}g</Text>
-            <Text style={styles.macroLabel}>Fats</Text>
-            <Text style={styles.macroProgress}>{nutrition.fatPercentage}%</Text>
-            <View style={styles.microProgressBar}>
+            <Text style={[styles.macroValue, { color: theme.text }]}>{nutrition.fat}g</Text>
+            <Text style={[styles.macroLabel, { color: theme.textSecondary }]}>Fats</Text>
+            <Text style={[styles.macroProgress, { color: theme.primary }]}>{nutrition.fatPercentage}%</Text>
+            <View style={[styles.microProgressBar, { backgroundColor: theme.placeholder }]}>
               <View 
                 style={[
                   styles.microProgress, 
-                  { width: `${Math.min(nutrition.fatPercentage, 100)}%` }
+                  { width: `${Math.min(nutrition.fatPercentage, 100)}%`, backgroundColor: theme.primary }
                 ]} 
               />
             </View>
@@ -322,49 +346,49 @@ export default function HomeScreen() {
 
         {/* Today's Meals */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Today's Meals</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Today's Meals</Text>
           <TouchableOpacity onPress={() => setIsHistoryVisible(true)}>
-            <Text style={styles.sectionAction}>View All</Text>
+            <Text style={[styles.sectionAction, { color: theme.primary }]}>View All</Text>
           </TouchableOpacity>
         </View>
         
         <View style={styles.mealsContainer}>
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#2E7D32" />
+              <ActivityIndicator size="large" color={theme.primary} />
             </View>
           ) : todayMeals.length === 0 ? (
-            <View style={styles.emptyMealsContainer}>
-              <Text style={styles.emptyMealsText}>No meals logged today</Text>
-              <Text style={styles.emptyMealsSubtext}>Tap "Log Meal" to add your first meal</Text>
+            <View style={[styles.emptyMealsContainer, { backgroundColor: theme.placeholder }]}>
+              <Text style={[styles.emptyMealsText, { color: theme.textSecondary }]}>No meals logged today</Text>
+              <Text style={[styles.emptyMealsSubtext, { color: isDarkMode ? '#777' : '#999' }]}>Tap "Log Meal" to add your first meal</Text>
             </View>
           ) : (
             todayMeals.map((meal, index) => (
               <TouchableOpacity 
                 key={meal.id || index.toString()} 
-                style={styles.mealItem}
+                style={[styles.mealItem, { backgroundColor: theme.card }]}
                 onPress={() => handleEditMeal(meal)}
               >
-                <View style={[styles.mealIcon, { backgroundColor: '#F3E5F5' }]}>
+                <View style={[styles.mealIcon, { backgroundColor: isDarkMode ? '#4A2F4A' : '#F3E5F5' }]}>
                   <Text style={styles.mealIconText}>🍽️</Text>
                 </View>
                 <View style={styles.mealInfo}>
-                  <Text style={styles.mealTitle}>{meal.food}</Text>
-                  <Text style={styles.mealDetails}>{meal.notes || 'No notes'}</Text>
+                  <Text style={[styles.mealTitle, { color: theme.text }]}>{meal.food}</Text>
+                  <Text style={[styles.mealDetails, { color: theme.textSecondary }]}>{meal.notes || 'No notes'}</Text>
                   <View style={styles.mealMacros}>
-                    <Text style={styles.mealCalories}>{meal.calories} kcal</Text>
+                    <Text style={[styles.mealCalories, { color: theme.primary }]}>{meal.calories} kcal</Text>
                     {meal.protein > 0 && (
-                      <Text style={styles.mealMacroText}>P: {meal.protein}g</Text>
+                      <Text style={[styles.mealMacroText, { color: theme.textSecondary }]}>P: {meal.protein}g</Text>
                     )}
                     {meal.carbs > 0 && (
-                      <Text style={styles.mealMacroText}>C: {meal.carbs}g</Text>
+                      <Text style={[styles.mealMacroText, { color: theme.textSecondary }]}>C: {meal.carbs}g</Text>
                     )}
                     {meal.fat > 0 && (
-                      <Text style={styles.mealMacroText}>F: {meal.fat}g</Text>
+                      <Text style={[styles.mealMacroText, { color: theme.textSecondary }]}>F: {meal.fat}g</Text>
                     )}
                   </View>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color="#999" />
+                <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
               </TouchableOpacity>
             ))
           )}
@@ -414,7 +438,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
   },
   header: {
     flexDirection: 'row',
@@ -426,13 +449,11 @@ const styles = StyleSheet.create({
   },
   headerDate: {
     fontSize: 15,
-    color: '#666666',
     marginBottom: 4,
   },
   greeting: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1a1a1a',
   },
   headerButtons: {
     flexDirection: 'row',
@@ -442,7 +463,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F5F5F5',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
@@ -451,19 +471,16 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#E0E0E0',
     alignItems: 'center',
     justifyContent: 'center',
   },
   profileInitial: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#424242',
   },
   summaryCard: {
     margin: 20,
     padding: 20,
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
@@ -483,7 +500,6 @@ const styles = StyleSheet.create({
     width: 110,
     height: 110,
     borderRadius: 55,
-    backgroundColor: '#F5F5F5',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 20,
@@ -491,11 +507,9 @@ const styles = StyleSheet.create({
   calorieCount: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#2E7D32',
   },
   calorieLabel: {
     fontSize: 14,
-    color: '#666666',
     marginTop: 2,
   },
   goalInfo: {
@@ -503,23 +517,19 @@ const styles = StyleSheet.create({
   },
   goalText: {
     fontSize: 15,
-    color: '#666666',
     marginBottom: 8,
   },
   progressBarContainer: {
     height: 6,
-    backgroundColor: '#F5F5F5',
     borderRadius: 3,
     marginBottom: 8,
   },
   progressBar: {
     height: 6,
-    backgroundColor: '#2E7D32',
     borderRadius: 3,
   },
   remainingText: {
     fontSize: 14,
-    color: '#2E7D32',
     fontWeight: '500',
   },
   quickActions: {
@@ -531,7 +541,6 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     padding: 15,
     borderRadius: 12,
     marginRight: 10,
@@ -551,7 +560,6 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     padding: 15,
     borderRadius: 12,
     marginLeft: 10,
@@ -571,26 +579,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F5F5F5',
     marginHorizontal: 20,
     marginBottom: 20,
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
     borderStyle: 'dashed',
   },
   barcodeButtonText: {
     marginLeft: 10,
     fontSize: 15,
     fontWeight: '500',
-    color: '#1a1a1a',
   },
   buttonIcon: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F5F5F5',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -601,7 +605,6 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#1a1a1a',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -613,11 +616,9 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a1a1a',
   },
   sectionAction: {
     fontSize: 14,
-    color: '#2E7D32',
     fontWeight: '500',
   },
   macrosScrollView: {
@@ -626,7 +627,6 @@ const styles = StyleSheet.create({
   },
   macroCard: {
     width: 130,
-    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 15,
     marginRight: 12,
@@ -656,29 +656,24 @@ const styles = StyleSheet.create({
   macroValue: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1a1a1a',
     marginBottom: 4,
   },
   macroLabel: {
     fontSize: 14,
-    color: '#666666',
     marginBottom: 8,
   },
   macroProgress: {
     fontSize: 13,
-    color: '#2E7D32',
     fontWeight: '500',
     marginBottom: 4,
   },
   microProgressBar: {
     height: 4,
-    backgroundColor: '#F5F5F5',
     borderRadius: 2,
     overflow: 'hidden',
   },
   microProgress: {
     height: 4,
-    backgroundColor: '#2E7D32',
     borderRadius: 2,
   },
   mealsContainer: {
@@ -688,7 +683,6 @@ const styles = StyleSheet.create({
   mealItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     padding: 15,
     borderRadius: 16,
     marginBottom: 12,
@@ -721,12 +715,10 @@ const styles = StyleSheet.create({
   mealTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
     marginBottom: 4,
   },
   mealDetails: {
     fontSize: 14,
-    color: '#666666',
     marginBottom: 4,
   },
   mealMacros: {
@@ -735,13 +727,11 @@ const styles = StyleSheet.create({
   },
   mealCalories: {
     fontSize: 13,
-    color: '#2E7D32',
     fontWeight: '500',
     marginRight: 8,
   },
   mealMacroText: {
     fontSize: 13,
-    color: '#666',
     marginRight: 8,
   },
   loadingContainer: {
@@ -751,19 +741,16 @@ const styles = StyleSheet.create({
   emptyMealsContainer: {
     padding: 30,
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
     borderRadius: 12,
     marginVertical: 10,
   },
   emptyMealsText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#666',
     marginBottom: 8,
   },
   emptyMealsSubtext: {
     fontSize: 14,
-    color: '#999',
     textAlign: 'center',
   },
 });
