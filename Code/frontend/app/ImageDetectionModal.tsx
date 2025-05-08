@@ -36,9 +36,12 @@ interface ImageDetectionModalProps {
   onSave: (mealEntry: MealEntry) => void;
 }
 
-// OpenAI API configuration
-const OPENAI_API_KEY = ''; // Replace with your actual API key
-const API_URL = 'https://api.openai.com/v1/chat/completions';
+// Hugging Face vision model and Nutritionix API configuration
+const HUGGING_FACE_API_KEY = 'api key';
+const VISION_API_URL = 'https://api-inference.huggingface.co/models/Salesforce/blip-food';
+const NUTRITION_API_URL = 'https://trackapi.nutritionix.com/v2/natural/nutrients';
+const NUTRITION_APP_ID = 'your_nutritionix_app_id';
+const NUTRITION_API_KEY = 'your_nutritionix_api_key';
 
 const ImageDetectionModal: React.FC<ImageDetectionModalProps> = ({ 
   visible, 
@@ -62,81 +65,75 @@ const ImageDetectionModal: React.FC<ImageDetectionModalProps> = ({
     }
   }, [visible, imageUri]);
 
-  // Function to analyze the image using OpenAI API
   const analyzeImage = async () => {
     if (!imageUri) return;
     
     setIsAnalyzing(true);
     
     try {
-      // Convert image to base64
       const imageBase64 = await getBase64FromUri(imageUri);
       if (!imageBase64) {
         throw new Error('Failed to convert image to base64');
       }
       
-      // Prepare request to OpenAI API
-      const response = await fetch(API_URL, {
+      const response = await fetch(VISION_API_URL, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`
+          'Authorization': `Bearer ${HUGGING_FACE_API_KEY}`,
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: "gpt-4o",
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: "Analyze this food image and provide nutritional information. Return the exact response in JSON format with the following structure: {\"food\": \"name of food\", \"calories\": number, \"protein\": number, \"carbs\": number, \"fat\": number, \"description\": \"brief description\"}"
-                },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: `data:image/jpeg;base64,${imageBase64}`
-                  }
-                }
-              ]
-            }
-          ],
-          max_tokens: 500
+          inputs: {
+            image: imageBase64
+          }
         })
       });
       
       if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
+        throw new Error(`Vision API request failed with status ${response.status}`);
       }
       
       const data = await response.json();
+      const foodDescription = data.generated_text || '';
       
-      // Extract the JSON response from the AI
-      const content = data.choices[0].message.content;
+      const nutritionResponse = await fetch(NUTRITION_API_URL, {
+        method: 'POST',
+        headers: {
+          'x-app-id': NUTRITION_APP_ID,
+          'x-app-key': NUTRITION_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          query: foodDescription
+        })
+      });
       
-      // Parse the JSON from the response
-      // The AI might return markdown or text with the JSON, so we need to extract it
-      const jsonMatch = content.match(/\{.*\}/s);
-      if (!jsonMatch) {
-        throw new Error('Failed to parse JSON from API response');
+      if (!nutritionResponse.ok) {
+        throw new Error(`Nutrition API request failed with status ${nutritionResponse.status}`);
       }
       
-      const nutritionData = JSON.parse(jsonMatch[0]);
+      const nutritionData = await nutritionResponse.json();
+      const food = nutritionData.foods[0] || {};
       
-      // Update state with the returned data
-      setDetectedFood(nutritionData.food || '');
-      setCalories(nutritionData.calories ? nutritionData.calories.toString() : '');
-      setProtein(nutritionData.protein ? nutritionData.protein.toString() : '');
-      setCarbs(nutritionData.carbs ? nutritionData.carbs.toString() : '');
-      setFat(nutritionData.fat ? nutritionData.fat.toString() : '');
+      setDetectedFood(foodDescription || 'Food item');
+      setCalories(food.nf_calories ? Math.round(food.nf_calories).toString() : '0');
+      setProtein(food.nf_protein ? Math.round(food.nf_protein).toString() : '0');
+      setCarbs(food.nf_total_carbohydrate ? Math.round(food.nf_total_carbohydrate).toString() : '0');
+      setFat(food.nf_total_fat ? Math.round(food.nf_total_fat).toString() : '0');
+      setNotes(`${foodDescription} - Analyzed using Hugging Face vision API and nutrition database`)
       
-      // Add the description to notes
-      setNotes(nutritionData.description || '');
-      
-      // Set analysis as complete to prevent multiple API calls
       setAnalysisComplete(true);
     } catch (error) {
       console.error('Error analyzing image:', error);
+      
+      const foodGuess = 'Food item';
+      setDetectedFood(foodGuess);
+      setCalories('0');
+      setProtein('0');
+      setCarbs('0');
+      setFat('0');
+      setNotes('Please enter nutritional information manually');
+      
       Alert.alert(
         'Analysis Failed',
         'Failed to analyze the image. Please enter the details manually.',
