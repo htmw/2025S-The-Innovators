@@ -13,12 +13,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { getMealEntries, deleteMealEntry, saveMealEntry } from './mealStorage';
 import EditMealModal, { MealData } from './EditMealModal';
+import { useTheme } from './ThemeContext';
 
 interface MealHistoryProps {
   onBack: () => void;
 }
 
 export default function MealHistory({ onBack }: MealHistoryProps) {
+  const { theme, isDarkMode } = useTheme();
   const [meals, setMeals] = useState<MealData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -32,7 +34,7 @@ export default function MealHistory({ onBack }: MealHistoryProps) {
     try {
       setRefreshing(true);
       const mealEntries = await getMealEntries();
-      setMeals(mealEntries.sort((a, b) => 
+      setMeals(mealEntries.sort((a: MealData, b: MealData) =>
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       ));
     } catch (error) {
@@ -78,51 +80,54 @@ export default function MealHistory({ onBack }: MealHistoryProps) {
 
   const renderMealItem = ({ item }: { item: MealData }) => (
     <TouchableOpacity
-      style={styles.mealItem}
+      style={[styles.mealItem, { backgroundColor: theme.card }]}
       onPress={() => handleEditMeal(item)}
     >
       <View style={styles.mealContent}>
         {item.image ? (
           <Image source={{ uri: item.image }} style={styles.mealImage} />
         ) : (
-          <View style={styles.mealIcon}>
+          <View style={[styles.mealIcon, { backgroundColor: isDarkMode ? '#4A2F4A' : '#F3E5F5' }]}>
             <Text style={styles.mealIconText}>🍽️</Text>
           </View>
         )}
         
         <View style={styles.mealInfo}>
-          <Text style={styles.mealTitle}>{item.food}</Text>
-          <Text style={styles.dateText}>{formatDate(item.timestamp)}</Text>
+          <Text style={[styles.mealTitle, { color: theme.text }]}>{item.food}</Text>
+          <Text style={[styles.dateText, { color: theme.textSecondary }]}>{formatDate(item.timestamp)}</Text>
           
           <View style={styles.macrosRow}>
-            <Text style={styles.macroText}>{item.calories} kcal</Text>
-            {item.protein > 0 && <Text style={styles.macroText}>P: {item.protein}g</Text>}
-            {item.carbs > 0 && <Text style={styles.macroText}>C: {item.carbs}g</Text>}
-            {item.fat > 0 && <Text style={styles.macroText}>F: {item.fat}g</Text>}
+            <Text style={[styles.macroText, { color: theme.primary }]}>{item.calories} kcal</Text>
+            {item.protein > 0 && <Text style={[styles.macroText, { color: theme.primary }]}>P: {item.protein}g</Text>}
+            {item.carbs > 0 && <Text style={[styles.macroText, { color: theme.primary }]}>C: {item.carbs}g</Text>}
+            {item.fat > 0 && <Text style={[styles.macroText, { color: theme.primary }]}>F: {item.fat}g</Text>}
           </View>
         </View>
         
-        <Ionicons name="chevron-forward" size={20} color="#999" />
+        <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
       </View>
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
       
-      <View style={styles.header}>
+      <View style={[styles.header, { 
+        backgroundColor: theme.card,
+        borderBottomColor: theme.border
+      }]}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Meal History</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Meal History</Text>
         <View style={styles.rightPlaceholder} />
       </View>
 
       {meals.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="restaurant-outline" size={50} color="#CCC" />
-          <Text style={styles.emptyText}>No meals recorded yet</Text>
+          <Ionicons name="restaurant-outline" size={50} color={theme.textSecondary} />
+          <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No meals recorded yet</Text>
         </View>
       ) : (
         <FlatList
@@ -130,7 +135,12 @@ export default function MealHistory({ onBack }: MealHistoryProps) {
           keyExtractor={(item) => item.id || item.timestamp}
           renderItem={renderMealItem}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={loadMeals} />
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={loadMeals}
+              tintColor={theme.primary}
+              colors={[theme.primary]} 
+            />
           }
           contentContainerStyle={styles.listContent}
         />
@@ -150,7 +160,6 @@ export default function MealHistory({ onBack }: MealHistoryProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F8F8',
   },
   header: {
     flexDirection: 'row',
@@ -158,9 +167,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
   },
   backButton: {
     padding: 4,
@@ -168,7 +175,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
   },
   rightPlaceholder: {
     width: 28,
@@ -177,7 +183,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   mealItem: {
-    backgroundColor: '#FFFFFF',
     marginHorizontal: 12,
     marginVertical: 6,
     borderRadius: 10,
@@ -196,7 +201,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F3E5F5',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -216,12 +220,10 @@ const styles = StyleSheet.create({
   mealTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#333',
     marginBottom: 2,
   },
   dateText: {
     fontSize: 13,
-    color: '#666',
     marginBottom: 4,
   },
   macrosRow: {
@@ -230,7 +232,6 @@ const styles = StyleSheet.create({
   },
   macroText: {
     fontSize: 12,
-    color: '#2E7D32',
     fontWeight: '500',
     marginRight: 10,
   },
@@ -241,7 +242,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
     marginTop: 12,
   }
 });
