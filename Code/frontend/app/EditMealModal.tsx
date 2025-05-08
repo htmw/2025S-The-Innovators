@@ -14,8 +14,8 @@ import {
   TouchableWithoutFeedback,
   Alert,
 } from 'react-native';
+import { useTheme } from './ThemeContext';
 
-// Define interfaces for TypeScript
 export interface MealData {
   id: string;
   food: string;
@@ -43,6 +43,7 @@ const EditMealModal: React.FC<EditMealModalProps> = ({
   onSave,
   onDelete
 }) => {
+  const { theme, isDarkMode } = useTheme();
   const [food, setFood] = useState('');
   const [calories, setCalories] = useState('');
   const [protein, setProtein] = useState('');
@@ -72,7 +73,6 @@ const EditMealModal: React.FC<EditMealModalProps> = ({
       return;
     }
 
-    // Create updated meal entry object
     const updatedMeal: MealData = {
       ...mealData,
       food: food,
@@ -127,18 +127,18 @@ const EditMealModal: React.FC<EditMealModalProps> = ({
           style={styles.modalContainer}
           keyboardVerticalOffset={10}
         >
-          <View style={styles.modalContent}>
-            <View style={styles.header}>
-              <Text style={styles.headerTitle}>Edit Meal</Text>
+          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+            <View style={[styles.header, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.headerTitle, { color: theme.text }]}>Edit Meal</Text>
               <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>✕</Text>
+                <Text style={[styles.closeButtonText, { color: theme.textSecondary }]}>✕</Text>
               </TouchableOpacity>
             </View>
 
             {mealData?.image && (
               <Image
                 source={{ uri: mealData.image }}
-                style={styles.previewImage}
+                style={[styles.previewImage, { backgroundColor: theme.placeholder }]}
                 resizeMode="cover"
               />
             )}
@@ -146,23 +146,25 @@ const EditMealModal: React.FC<EditMealModalProps> = ({
             <ScrollView contentContainerStyle={styles.scrollContent}>
               <View style={styles.form}>
                 <View style={styles.inputContainer}>
-                  <Text style={styles.label}>Food Item</Text>
+                  <Text style={[styles.label, { color: theme.textSecondary }]}>Food Item</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { backgroundColor: theme.placeholder, color: theme.text }]}
                     value={food}
                     onChangeText={setFood}
                     placeholder="What food did you eat?"
+                    placeholderTextColor={theme.textSecondary}
                     returnKeyType="next"
                   />
                 </View>
 
                 <View style={styles.inputContainer}>
-                  <Text style={styles.label}>Calories</Text>
+                  <Text style={[styles.label, { color: theme.textSecondary }]}>Calories</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { backgroundColor: theme.placeholder, color: theme.text }]}
                     value={calories}
                     onChangeText={setCalories}
                     placeholder="Estimated calories"
+                    placeholderTextColor={theme.textSecondary}
                     keyboardType="numeric"
                     returnKeyType="next"
                   />
@@ -170,36 +172,39 @@ const EditMealModal: React.FC<EditMealModalProps> = ({
                 
                 <View style={styles.macroRow}>
                   <View style={[styles.inputContainer, styles.macroInput]}>
-                    <Text style={styles.label}>Protein (g)</Text>
+                    <Text style={[styles.label, { color: theme.textSecondary }]}>Protein (g)</Text>
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, { backgroundColor: theme.placeholder, color: theme.text }]}
                       value={protein}
                       onChangeText={setProtein}
                       placeholder="0"
+                      placeholderTextColor={theme.textSecondary}
                       keyboardType="numeric"
                       returnKeyType="next"
                     />
                   </View>
                   
                   <View style={[styles.inputContainer, styles.macroInput]}>
-                    <Text style={styles.label}>Carbs (g)</Text>
+                    <Text style={[styles.label, { color: theme.textSecondary }]}>Carbs (g)</Text>
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, { backgroundColor: theme.placeholder, color: theme.text }]}
                       value={carbs}
                       onChangeText={setCarbs}
                       placeholder="0"
+                      placeholderTextColor={theme.textSecondary}
                       keyboardType="numeric"
                       returnKeyType="next"
                     />
                   </View>
                   
                   <View style={[styles.inputContainer, styles.macroInput]}>
-                    <Text style={styles.label}>Fat (g)</Text>
+                    <Text style={[styles.label, { color: theme.textSecondary }]}>Fat (g)</Text>
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, { backgroundColor: theme.placeholder, color: theme.text }]}
                       value={fat}
                       onChangeText={setFat}
                       placeholder="0"
+                      placeholderTextColor={theme.textSecondary}
                       keyboardType="numeric"
                       returnKeyType="next"
                     />
@@ -207,12 +212,17 @@ const EditMealModal: React.FC<EditMealModalProps> = ({
                 </View>
 
                 <View style={styles.inputContainer}>
-                  <Text style={styles.label}>Notes</Text>
+                  <Text style={[styles.label, { color: theme.textSecondary }]}>Notes</Text>
                   <TextInput
-                    style={[styles.input, styles.textArea]}
+                    style={[
+                      styles.input, 
+                      styles.textArea, 
+                      { backgroundColor: theme.placeholder, color: theme.text }
+                    ]}
                     value={notes}
                     onChangeText={setNotes}
                     placeholder="Add any additional notes"
+                    placeholderTextColor={theme.textSecondary}
                     multiline
                     returnKeyType="done"
                     blurOnSubmit={true}
@@ -222,14 +232,20 @@ const EditMealModal: React.FC<EditMealModalProps> = ({
 
                 <View style={styles.buttonRow}>
                   <TouchableOpacity 
-                    style={styles.deleteButton} 
+                    style={[
+                      styles.deleteButton, 
+                      { 
+                        backgroundColor: isDarkMode ? '#2A2A2A' : '#FFF',
+                        borderColor: theme.error 
+                      }
+                    ]} 
                     onPress={handleDelete}
                   >
-                    <Text style={styles.deleteButtonText}>Delete</Text>
+                    <Text style={[styles.deleteButtonText, { color: theme.error }]}>Delete</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity 
-                    style={styles.saveButton} 
+                    style={[styles.saveButton, { backgroundColor: theme.primary }]} 
                     onPress={handleSave}
                   >
                     <Text style={styles.saveButtonText}>Save Changes</Text>
@@ -251,7 +267,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: Platform.OS === 'ios' ? 34 : 24,
@@ -263,24 +278,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a1a1a',
   },
   closeButton: {
     padding: 8,
   },
   closeButtonText: {
     fontSize: 20,
-    color: '#666666',
   },
   previewImage: {
     width: '100%',
     height: 200,
-    backgroundColor: '#F5F5F5',
   },
   scrollContent: {
     flexGrow: 1,
@@ -301,15 +312,12 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    color: '#666666',
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#F5F5F5',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: '#1a1a1a',
   },
   textArea: {
     height: 80,
@@ -322,7 +330,6 @@ const styles = StyleSheet.create({
     marginBottom: Platform.OS === 'ios' ? 30 : 10,
   },
   saveButton: {
-    backgroundColor: '#2E7D32',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -335,16 +342,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   deleteButton: {
-    backgroundColor: '#FFF',
     borderWidth: 1,
-    borderColor: '#E53935',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
     flex: 1,
   },
   deleteButtonText: {
-    color: '#E53935',
     fontSize: 16,
     fontWeight: '600',
   },
